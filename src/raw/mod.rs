@@ -376,6 +376,36 @@ impl<T, A: AllocRef + Clone> RawTable<T, A> {
     ///
     /// The control bytes are left uninitialized.
     #[cfg_attr(feature = "inline-more", inline)]
+    #[cfg(feature = "nightly")]
+    unsafe fn new_uninitialized(
+        mut alloc: A,
+        buckets: usize,
+        fallability: Fallibility,
+    ) -> Result<Self, CollectionAllocErr> {
+        debug_assert!(buckets.is_power_of_two());
+        let (layout, data_offset) =
+            calculate_layout::<T>(buckets).ok_or_else(|| fallability.capacity_overflow())?;
+        let ctrl = alloc
+            .alloc(layout)
+            .map(|(ptr, _)| ptr)
+            .map_err(|_| fallability.alloc_err(layout))?;
+        let data = NonNull::new_unchecked(ctrl.as_ptr().add(data_offset) as *mut T);
+        Ok(Self {
+            data,
+            ctrl,
+            bucket_mask: buckets - 1,
+            items: 0,
+            growth_left: bucket_mask_to_capacity(buckets - 1),
+            marker: PhantomData,
+            alloc,
+        })
+    }
+
+    /// Allocates a new hash table with the given number of buckets.
+    ///
+    /// The control bytes are left uninitialized.
+    #[cfg_attr(feature = "inline-more", inline)]
+    #[cfg(not(feature = "nightly"))]
     unsafe fn new_uninitialized(
         mut alloc: A,
         buckets: usize,

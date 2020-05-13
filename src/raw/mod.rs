@@ -386,8 +386,8 @@ impl<T, A: AllocRef + Clone> RawTable<T, A> {
         let (layout, data_offset) =
             calculate_layout::<T>(buckets).ok_or_else(|| fallability.capacity_overflow())?;
         let ctrl = alloc
-            .alloc(layout)
-            .map(|(ptr, _)| ptr)
+            .alloc(layout, self::alloc::AllocInit::Uninitialized)
+            .map(|block| block.ptr)
             .map_err(|_| fallability.alloc_err(layout))?;
         let data = NonNull::new_unchecked(ctrl.as_ptr().add(data_offset) as *mut T);
         Ok(Self {
